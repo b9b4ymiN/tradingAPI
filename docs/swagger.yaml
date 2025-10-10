@@ -1,0 +1,529 @@
+basePath: /
+definitions:
+  models.CancelOrderRequest:
+    properties:
+      orderId:
+        description: 'Optional: cancel specific order'
+        example: 123456789
+        type: integer
+      symbol:
+        description: 'Optional: cancel by symbol'
+        example: BTCUSDT
+        type: string
+    type: object
+  models.ClosePositionRequest:
+    properties:
+      symbol:
+        example: BTCUSDT
+        type: string
+      tradeId:
+        description: 'Optional: link to Firebase trade'
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+    required:
+    - symbol
+    type: object
+  models.Trade:
+    properties:
+      closedAt:
+        example: 1640999800
+        type: integer
+      createdAt:
+        example: 1640995200
+        type: integer
+      entryPrice:
+        example: 50000
+        type: number
+      error:
+        example: ""
+        type: string
+      executedAt:
+        example: 1640995260
+        type: integer
+      executedPrice:
+        example: 50100.5
+        type: number
+      id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      leverage:
+        example: 10
+        type: integer
+      orderId:
+        example: 123456789
+        type: integer
+      pnl:
+        example: 250.75
+        type: number
+      side:
+        example: BUY
+        type: string
+      size:
+        example: 1000
+        type: number
+      status:
+        description: PENDING, ACTIVE, FILLED, CANCELED, FAILED
+        example: ACTIVE
+        type: string
+      stopLoss:
+        example: 49000
+        type: number
+      symbol:
+        example: BTCUSDT
+        type: string
+      takeProfit:
+        example: 52000
+        type: number
+      userId:
+        example: user123
+        type: string
+    type: object
+  models.TradeRequest:
+    properties:
+      entryPrice:
+        example: 50000
+        type: number
+      leverage:
+        example: 10
+        maximum: 125
+        minimum: 1
+        type: integer
+      side:
+        description: '"BUY" or "SELL"'
+        example: BUY
+        type: string
+      size:
+        description: Position size in USDT
+        example: 1000
+        type: number
+      stopLoss:
+        example: 49000
+        type: number
+      symbol:
+        description: e.g., "BTCUSDT"
+        example: BTCUSDT
+        type: string
+      takeProfit:
+        example: 52000
+        type: number
+      userId:
+        example: user123
+        type: string
+    required:
+    - entryPrice
+    - leverage
+    - side
+    - size
+    - stopLoss
+    - symbol
+    - takeProfit
+    - userId
+    type: object
+  models.TradeResponse:
+    properties:
+      data: {}
+      error:
+        example: ""
+        type: string
+      message:
+        example: Trade executed successfully
+        type: string
+      success:
+        example: true
+        type: boolean
+      timestamp:
+        example: 1640995200
+        type: integer
+      tradeId:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@cryptotradingapi.com
+    name: API Support
+  description: |-
+    Professional cryptocurrency trading API with automated Stop Loss and Take Profit
+    Supports Binance Futures trading with real-time monitoring and Firebase logging
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  title: Crypto Trading API
+  version: "1.0"
+paths:
+  /api/balance:
+    get:
+      description: Retrieve current account balance and asset information from Binance
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Account balance retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.TradeResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized - Invalid API key
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "500":
+          description: Failed to get account balance
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get account balance
+      tags:
+      - Account
+  /api/orders:
+    get:
+      description: Retrieve all pending orders, optionally filtered by symbol
+      parameters:
+      - description: Filter by trading symbol (e.g., BTCUSDT)
+        in: query
+        name: symbol
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Pending orders retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.TradeResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized - Invalid API key
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "500":
+          description: Failed to get pending orders
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get pending orders
+      tags:
+      - Orders
+  /api/orders/cancel:
+    post:
+      consumes:
+      - application/json
+      description: Cancel pending orders by symbol, specific order ID, or all orders
+      parameters:
+      - description: Cancel parameters (optional)
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/models.CancelOrderRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Orders cancelled successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.TradeResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized - Invalid API key
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "500":
+          description: Failed to cancel orders
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Cancel orders
+      tags:
+      - Orders
+  /api/position/close:
+    post:
+      consumes:
+      - application/json
+      description: Close an open futures position for a specific symbol
+      parameters:
+      - description: Close position parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.ClosePositionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Position closed successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.TradeResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "400":
+          description: Invalid request
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "401":
+          description: Unauthorized - Invalid API key
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "500":
+          description: Failed to close position
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Close position
+      tags:
+      - Positions
+  /api/positions:
+    get:
+      description: Retrieve all open futures positions with profit/loss information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Open positions retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.TradeResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized - Invalid API key
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "500":
+          description: Failed to get open positions
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get open positions
+      tags:
+      - Positions
+  /api/status:
+    get:
+      description: Retrieve comprehensive system status including server, Binance
+        connection, and Firebase stats
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: System status retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.TradeResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized - Invalid API key
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get system status
+      tags:
+      - System
+  /api/summary:
+    get:
+      description: Retrieve comprehensive trading statistics and performance metrics
+        for a specified time period
+      parameters:
+      - description: 'Time period: 1d, 7d, 1w, 1m (default: 1d)'
+        in: query
+        name: period
+        type: string
+      - description: Filter by user ID (optional)
+        in: query
+        name: userId
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Trading summary retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.TradeResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized - Invalid API key
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "500":
+          description: Failed to get trading summary
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get trading summary
+      tags:
+      - Analytics
+  /api/trade:
+    post:
+      consumes:
+      - application/json
+      description: Execute a futures trade on Binance with stop loss and take profit
+      parameters:
+      - description: Trade parameters
+        in: body
+        name: trade
+        required: true
+        schema:
+          $ref: '#/definitions/models.TradeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Trade executed successfully
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "400":
+          description: Invalid request or trade parameters
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "401":
+          description: Unauthorized - Invalid API key
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "500":
+          description: Internal server error - Trade execution failed
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Execute a new trade
+      tags:
+      - Trading
+  /api/trade/{tradeId}:
+    get:
+      description: Retrieve a specific trade by its unique ID
+      parameters:
+      - description: Trade ID
+        in: path
+        name: tradeId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Trade retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.TradeResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Trade'
+              type: object
+        "401":
+          description: Unauthorized - Invalid API key
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "404":
+          description: Trade not found
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get trade by ID
+      tags:
+      - Trading
+  /api/trades/{userId}:
+    get:
+      description: Retrieve all trades for a specific user ID
+      parameters:
+      - description: User ID
+        in: path
+        name: userId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Trades retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.TradeResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/models.Trade'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized - Invalid API key
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "500":
+          description: Internal server error - Failed to fetch trades
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get user trades
+      tags:
+      - Trading
+  /health:
+    get:
+      description: Check if the API server is running and healthy
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Server is healthy
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Health check
+      tags:
+      - Health
+securityDefinitions:
+  ApiKeyAuth:
+    description: Enter your API key to access protected endpoints
+    in: header
+    name: X-API-Key
+    type: apiKey
+swagger: "2.0"
+tags:
+- description: Health check endpoints
+  name: Health
+- description: Trading operations (place, view, close trades)
+  name: Trading
+- description: Account and balance information
+  name: Account
+- description: Position and order management
+  name: Positions
+- description: Order management and cancellation
+  name: Orders
+- description: System status and monitoring
+  name: System
+- description: Trading analytics and statistics
+  name: Analytics

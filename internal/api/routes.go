@@ -3,10 +3,10 @@ package api
 import (
 	"crypto-trading-api/internal/binance"
 	"crypto-trading-api/internal/firebase"
-	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // SetupRouter configures all routes and middleware
@@ -18,13 +18,11 @@ func SetupRouter(fb *firebase.Client, bn *binance.Client) *gin.Engine {
 	router.Use(CORSMiddleware())
 	router.Use(RateLimitMiddleware())
 
+	// Swagger documentation
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	// Health check
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status": "healthy",
-			"time":   time.Now().Unix(),
-		})
-	})
+	router.GET("/health", HealthCheck)
 
 	// Basic API routes
 	apiGroup := router.Group("/api")
@@ -36,13 +34,13 @@ func SetupRouter(fb *firebase.Client, bn *binance.Client) *gin.Engine {
 		apiGroup.GET("/trade/:tradeId", GetTradeHandler(fb))
 
 		// Advanced endpoints
-		apiGroup.GET("/status", SystemStatusHandler(fb, bn))              // System status
-		apiGroup.GET("/balance", AccountBalanceHandler(bn))                // Account balance
-		apiGroup.GET("/positions", OpenPositionsHandler(bn))              // Open positions
-		apiGroup.GET("/orders", PendingOrdersHandler(bn))                 // Pending orders
-		apiGroup.POST("/orders/cancel", CancelOrdersHandler(bn))          // Cancel orders
-		apiGroup.POST("/position/close", ClosePositionHandler(bn, fb))    // Close position
-		apiGroup.GET("/summary", TradingSummaryHandler(fb, bn))           // Trading summary
+		apiGroup.GET("/status", SystemStatusHandler(fb, bn))           // System status
+		apiGroup.GET("/balance", AccountBalanceHandler(bn))            // Account balance
+		apiGroup.GET("/positions", OpenPositionsHandler(bn))           // Open positions
+		apiGroup.GET("/orders", PendingOrdersHandler(bn))              // Pending orders
+		apiGroup.POST("/orders/cancel", CancelOrdersHandler(bn))       // Cancel orders
+		apiGroup.POST("/position/close", ClosePositionHandler(bn, fb)) // Close position
+		apiGroup.GET("/summary", TradingSummaryHandler(fb, bn))        // Trading summary
 	}
 
 	return router

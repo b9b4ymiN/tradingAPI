@@ -29,6 +29,18 @@ type BinanceInterface interface {
 }
 
 // TradeHandler - Main function to handle trade requests
+// @Summary      Execute a new trade
+// @Description  Execute a futures trade on Binance with stop loss and take profit
+// @Tags         Trading
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        trade  body      models.TradeRequest  true  "Trade parameters"
+// @Success      200    {object}  models.TradeResponse  "Trade executed successfully"
+// @Failure      400    {object}  models.TradeResponse  "Invalid request or trade parameters"
+// @Failure      401    {object}  models.TradeResponse  "Unauthorized - Invalid API key"
+// @Failure      500    {object}  models.TradeResponse  "Internal server error - Trade execution failed"
+// @Router       /api/trade [post]
 func TradeHandler(fb FirebaseInterface, bn BinanceInterface) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req models.TradeRequest
@@ -123,6 +135,16 @@ func TradeHandler(fb FirebaseInterface, bn BinanceInterface) gin.HandlerFunc {
 }
 
 // GetTradesHandler - Get trades for a user
+// @Summary      Get user trades
+// @Description  Retrieve all trades for a specific user ID
+// @Tags         Trading
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        userId  path      string  true  "User ID"
+// @Success      200     {object}  models.TradeResponse{data=[]models.Trade}  "Trades retrieved successfully"
+// @Failure      401     {object}  models.TradeResponse  "Unauthorized - Invalid API key"
+// @Failure      500     {object}  models.TradeResponse  "Internal server error - Failed to fetch trades"
+// @Router       /api/trades/{userId} [get]
 func GetTradesHandler(fb FirebaseInterface) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := c.Param("userId")
@@ -148,6 +170,16 @@ func GetTradesHandler(fb FirebaseInterface) gin.HandlerFunc {
 }
 
 // GetTradeHandler - Get single trade
+// @Summary      Get trade by ID
+// @Description  Retrieve a specific trade by its unique ID
+// @Tags         Trading
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        tradeId  path      string  true  "Trade ID"
+// @Success      200      {object}  models.TradeResponse{data=models.Trade}  "Trade retrieved successfully"
+// @Failure      401      {object}  models.TradeResponse  "Unauthorized - Invalid API key"
+// @Failure      404      {object}  models.TradeResponse  "Trade not found"
+// @Router       /api/trade/{tradeId} [get]
 func GetTradeHandler(fb FirebaseInterface) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tradeID := c.Param("tradeId")

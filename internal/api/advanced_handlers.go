@@ -13,6 +13,15 @@ import (
 var serverStartTime = time.Now().Unix()
 
 // SystemStatusHandler - Get system status
+// @Summary      Get system status
+// @Description  Retrieve comprehensive system status including server, Binance connection, and Firebase stats
+// @Tags         System
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Success      200  {object}  models.TradeResponse{data=object}  "System status retrieved successfully"
+// @Failure      401  {object}  models.TradeResponse  "Unauthorized - Invalid API key"
+// @Failure      500  {object}  models.TradeResponse  "Internal server error"
+// @Router       /api/status [get]
 func SystemStatusHandler(fb *firebase.Client, bn *binance.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx := c.Request.Context()
@@ -83,6 +92,15 @@ func SystemStatusHandler(fb *firebase.Client, bn *binance.Client) gin.HandlerFun
 }
 
 // AccountBalanceHandler - Get account balance
+// @Summary      Get account balance
+// @Description  Retrieve current account balance and asset information from Binance
+// @Tags         Account
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Success      200  {object}  models.TradeResponse{data=object}  "Account balance retrieved successfully"
+// @Failure      401  {object}  models.TradeResponse  "Unauthorized - Invalid API key"
+// @Failure      500  {object}  models.TradeResponse  "Failed to get account balance"
+// @Router       /api/balance [get]
 func AccountBalanceHandler(bn *binance.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		account, err := bn.GetAccountInfo()
@@ -109,6 +127,15 @@ func AccountBalanceHandler(bn *binance.Client) gin.HandlerFunc {
 }
 
 // OpenPositionsHandler - Get open positions with PnL
+// @Summary      Get open positions
+// @Description  Retrieve all open futures positions with profit/loss information
+// @Tags         Positions
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Success      200  {object}  models.TradeResponse{data=object}  "Open positions retrieved successfully"
+// @Failure      401  {object}  models.TradeResponse  "Unauthorized - Invalid API key"
+// @Failure      500  {object}  models.TradeResponse  "Failed to get open positions"
+// @Router       /api/positions [get]
 func OpenPositionsHandler(bn *binance.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		positions, err := bn.GetOpenPositions()
@@ -162,6 +189,16 @@ func OpenPositionsHandler(bn *binance.Client) gin.HandlerFunc {
 }
 
 // PendingOrdersHandler - Get pending orders
+// @Summary      Get pending orders
+// @Description  Retrieve all pending orders, optionally filtered by symbol
+// @Tags         Orders
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        symbol  query     string  false  "Filter by trading symbol (e.g., BTCUSDT)"
+// @Success      200     {object}  models.TradeResponse{data=object}  "Pending orders retrieved successfully"
+// @Failure      401     {object}  models.TradeResponse  "Unauthorized - Invalid API key"
+// @Failure      500     {object}  models.TradeResponse  "Failed to get pending orders"
+// @Router       /api/orders [get]
 func PendingOrdersHandler(bn *binance.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		symbol := c.Query("symbol") // Optional: filter by symbol
@@ -210,12 +247,20 @@ func PendingOrdersHandler(bn *binance.Client) gin.HandlerFunc {
 }
 
 // CancelOrdersHandler - Cancel pending orders
+// @Summary      Cancel orders
+// @Description  Cancel pending orders by symbol, specific order ID, or all orders
+// @Tags         Orders
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        request  body      models.CancelOrderRequest  false  "Cancel parameters (optional)"
+// @Success      200      {object}  models.TradeResponse{data=object}  "Orders cancelled successfully"
+// @Failure      401      {object}  models.TradeResponse  "Unauthorized - Invalid API key"
+// @Failure      500      {object}  models.TradeResponse  "Failed to cancel orders"
+// @Router       /api/orders/cancel [post]
 func CancelOrdersHandler(bn *binance.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var req struct {
-			Symbol  string `json:"symbol"`  // Optional: cancel by symbol
-			OrderID int64  `json:"orderId"` // Optional: cancel specific order
-		}
+		var req models.CancelOrderRequest
 
 		if err := c.ShouldBindJSON(&req); err != nil {
 			// If no body, cancel all orders
@@ -301,12 +346,21 @@ func CancelOrdersHandler(bn *binance.Client) gin.HandlerFunc {
 }
 
 // ClosePositionHandler - Close a position
+// @Summary      Close position
+// @Description  Close an open futures position for a specific symbol
+// @Tags         Positions
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        request  body      models.ClosePositionRequest  true  "Close position parameters"
+// @Success      200      {object}  models.TradeResponse{data=object}  "Position closed successfully"
+// @Failure      400      {object}  models.TradeResponse  "Invalid request"
+// @Failure      401      {object}  models.TradeResponse  "Unauthorized - Invalid API key"
+// @Failure      500      {object}  models.TradeResponse  "Failed to close position"
+// @Router       /api/position/close [post]
 func ClosePositionHandler(bn *binance.Client, fb *firebase.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var req struct {
-			Symbol  string `json:"symbol" binding:"required"`
-			TradeID string `json:"tradeId"` // Optional: link to Firebase trade
-		}
+		var req models.ClosePositionRequest
 
 		if err := c.ShouldBindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, models.TradeResponse{
@@ -351,6 +405,17 @@ func ClosePositionHandler(bn *binance.Client, fb *firebase.Client) gin.HandlerFu
 }
 
 // TradingSummaryHandler - Get trading summary for period
+// @Summary      Get trading summary
+// @Description  Retrieve comprehensive trading statistics and performance metrics for a specified time period
+// @Tags         Analytics
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        period  query     string  false  "Time period: 1d, 7d, 1w, 1m (default: 1d)"
+// @Param        userId  query     string  false  "Filter by user ID (optional)"
+// @Success      200     {object}  models.TradeResponse{data=object}  "Trading summary retrieved successfully"
+// @Failure      401     {object}  models.TradeResponse  "Unauthorized - Invalid API key"
+// @Failure      500     {object}  models.TradeResponse  "Failed to get trading summary"
+// @Router       /api/summary [get]
 func TradingSummaryHandler(fb *firebase.Client, bn *binance.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		period := c.DefaultQuery("period", "1d") // 1d, 7d, 1w, 1m

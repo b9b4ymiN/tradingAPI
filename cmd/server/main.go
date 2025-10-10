@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto-trading-api/config"
+	_ "crypto-trading-api/docs" // Import generated Swagger docs
 	"crypto-trading-api/internal/api"
 	"crypto-trading-api/internal/binance"
 	"crypto-trading-api/internal/firebase"
@@ -15,6 +16,46 @@ import (
 
 	"github.com/gin-gonic/gin"
 )
+
+// @title           Crypto Trading API
+// @version         1.0
+// @description     Professional cryptocurrency trading API with automated Stop Loss and Take Profit
+// @description     Supports Binance Futures trading with real-time monitoring and Firebase logging
+
+// @contact.name   API Support
+// @contact.email  support@cryptotradingapi.com
+
+// @license.name  MIT
+// @license.url   https://opensource.org/licenses/MIT
+
+// @host      localhost:8080
+// @BasePath  /
+
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name X-API-Key
+// @description Enter your API key to access protected endpoints
+
+// @tag.name Health
+// @tag.description Health check endpoints
+
+// @tag.name Trading
+// @tag.description Trading operations (place, view, close trades)
+
+// @tag.name Account
+// @tag.description Account and balance information
+
+// @tag.name Positions
+// @tag.description Position and order management
+
+// @tag.name Orders
+// @tag.description Order management and cancellation
+
+// @tag.name System
+// @tag.description System status and monitoring
+
+// @tag.name Analytics
+// @tag.description Trading analytics and statistics
 
 func main() {
 	// Load configuration
@@ -48,6 +89,7 @@ func main() {
 	// Start server in goroutine
 	go func() {
 		log.Printf("🚀 Server starting on port %s", cfg.Port)
+		log.Printf("📄 Swagger docs: http://localhost:%s/swagger/index.html", cfg.Port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server failed to start: %v", err)
 		}
