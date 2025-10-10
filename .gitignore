@@ -88,3 +88,7 @@ node_modules/
 # Deployment scripts with secrets
 deploy-secrets.sh
 *.secret.sh
+
+# Claude
+.claude/
+Claude.md
