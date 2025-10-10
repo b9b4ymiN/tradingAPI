@@ -1,0 +1,62 @@
+# Binaries and build artifacts
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+
+# Go workspace file
+go.work
+
+# Environment files (should be configured on server)
+.env
+.env.local
+.env.*.local
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Claude AI settings
+.claude/
+
+# Git
+.git/
+.gitignore
+
+# Documentation (not needed in container)
+*.md
+!README.md
+
+# Test scripts (not needed in production container)
+script/
+
+# Logs
+*.log
+server.log
+
+# Temporary files
+*.tmp
+*.temp
+firebase-rules-temp.json
+
+# Windows specific
+Thumbs.db
+ehthumbs.db
+
+# Docker files (already being used)
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Testing and development only
+TEST_*.md
+*_test.go
