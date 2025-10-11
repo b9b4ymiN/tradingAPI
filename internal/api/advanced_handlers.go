@@ -5,6 +5,7 @@ import (
 	"crypto-trading-api/internal/firebase"
 	"crypto-trading-api/internal/models"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -530,5 +531,115 @@ func calculateTradingSummary(trades []*models.Trade, startTime int64) gin.H {
 		"worstTrade":    worstTrade,
 		"averagePnL":    avgPnL,
 		"symbolStats":   symbolStats,
+	}
+}
+
+// ExchangeInfoHandler - Get exchange trading rules and symbol information
+// @Summary      Get exchange info
+// @Description  Retrieve trading rules, minimum order sizes, and symbol information from Binance
+// @Tags         Exchange
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        symbol  query     string  false  "Filter by specific symbol (e.g., BTCUSDT). If not provided, returns all symbols."
+// @Success      200     {object}  models.TradeResponse{data=object}  "Exchange info retrieved successfully"
+// @Failure      401     {object}  models.TradeResponse  "Unauthorized - Invalid API key"
+// @Failure      500     {object}  models.TradeResponse  "Failed to get exchange info"
+// @Router       /api/exchange/info [get]
+func ExchangeInfoHandler(bn *binance.Client) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		symbol := c.Query("symbol") // Optional: filter by specific symbol
+
+		// Get exchange info from Binance
+		exchangeInfo, err := bn.GetExchangeInfo(symbol)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, models.TradeResponse{
+				Success:   false,
+				Message:   "Failed to get exchange info",
+				Error:     err.Error(),
+				Timestamp: time.Now().Unix(),
+			})
+			return
+		}
+
+		// Build response data
+		data := gin.H{
+			"timezone":     exchangeInfo.Timezone,
+			"serverTime":   exchangeInfo.ServerTime,
+			"symbolCount":  len(exchangeInfo.Symbols),
+			"symbols":      exchangeInfo.Symbols,
+		}
+
+		c.JSON(http.StatusOK, models.TradeResponse{
+			Success:   true,
+			Message:   "Exchange info retrieved successfully",
+			Data:      data,
+			Timestamp: time.Now().Unix(),
+		})
+	}
+}
+
+// AccountSnapshotHandler - Get daily account snapshot history
+// @Summary      Get account snapshot
+// @Description  Retrieve daily snapshots of Futures account balance and positions (historical data, 7-30 days)
+// @Tags         Account
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        startTime  query     int     false  "Start time (Unix timestamp in milliseconds)"
+// @Param        endTime    query     int     false  "End time (Unix timestamp in milliseconds)"
+// @Param        limit      query     int     false  "Number of days (7-30, default 7)"
+// @Success      200        {object}  models.TradeResponse{data=object}  "Account snapshot retrieved successfully"
+// @Failure      401        {object}  models.TradeResponse  "Unauthorized - Invalid API key"
+// @Failure      500        {object}  models.TradeResponse  "Failed to get account snapshot"
+// @Router       /api/account/snapshot [get]
+func AccountSnapshotHandler(bn *binance.Client) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Parse query parameters
+		var startTime, endTime int64
+		var limit int
+
+		if st := c.Query("startTime"); st != "" {
+			if parsed, err := strconv.ParseInt(st, 10, 64); err == nil {
+				startTime = parsed
+			}
+		}
+
+		if et := c.Query("endTime"); et != "" {
+			if parsed, err := strconv.ParseInt(et, 10, 64); err == nil {
+				endTime = parsed
+			}
+		}
+
+		if l := c.Query("limit"); l != "" {
+			if parsed, err := strconv.Atoi(l); err == nil {
+				limit = parsed
+			}
+		}
+
+		// Get snapshot from Binance
+		snapshot, err := bn.GetAccountSnapshot(startTime, endTime, limit)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, models.TradeResponse{
+				Success:   false,
+				Message:   "Failed to get account snapshot",
+				Error:     err.Error(),
+				Timestamp: time.Now().Unix(),
+			})
+			return
+		}
+
+		// Build response
+		data := gin.H{
+			"code":        snapshot.Code,
+			"msg":         snapshot.Msg,
+			"snapshotCount": len(snapshot.SnapshotVos),
+			"snapshots":   snapshot.SnapshotVos,
+		}
+
+		c.JSON(http.StatusOK, models.TradeResponse{
+			Success:   true,
+			Message:   "Account snapshot retrieved successfully",
+			Data:      data,
+			Timestamp: time.Now().Unix(),
+		})
 	}
 }

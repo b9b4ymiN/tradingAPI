@@ -41,6 +41,8 @@ func SetupRouter(fb *firebase.Client, bn *binance.Client) *gin.Engine {
 		apiGroup.POST("/orders/cancel", CancelOrdersHandler(bn))       // Cancel orders
 		apiGroup.POST("/position/close", ClosePositionHandler(bn, fb)) // Close position
 		apiGroup.GET("/summary", TradingSummaryHandler(fb, bn))        // Trading summary
+		apiGroup.GET("/exchange/info", ExchangeInfoHandler(bn))        // Exchange info (min trade sizes, etc.)
+		apiGroup.GET("/account/snapshot", AccountSnapshotHandler(bn))  // Daily account snapshot
 	}
 
 	return router

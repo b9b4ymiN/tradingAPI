@@ -76,13 +76,30 @@ func (b *Client) PlaceFuturesOrder(trade *models.Trade) (*OrderResult, error) {
 	// 2. Calculate quantity
 	quantity := b.calculateQuantity(trade.Size, trade.EntryPrice, trade.Leverage)
 
-	// 3. Place market order
-	order, err := b.client.NewCreateOrderService().
+	// 2.1 Validate minimum notional value (position size)
+	// Different symbols have different minimums:
+	// - BTCUSDT, ETHUSDT: $100 minimum
+	// - XRP, TRX, ADA, BNB, etc.: $5 minimum
+	// - Check Binance docs for specific symbol requirements
+
+	// 3. Place order (MARKET or LIMIT)
+	orderService := b.client.NewCreateOrderService().
 		Symbol(trade.Symbol).
 		Side(futures.SideType(trade.Side)).
-		Type(futures.OrderTypeMarket).
-		Quantity(quantity).
-		Do(ctx)
+		Quantity(quantity)
+
+	// Choose order type based on trade.OrderType
+	if trade.OrderType == "LIMIT" {
+		// LIMIT order: Wait for specific entry price
+		orderService.Type(futures.OrderTypeLimit).
+			Price(fmt.Sprintf("%.8f", trade.EntryPrice)).
+			TimeInForce(futures.TimeInForceTypeGTC) // Good Till Cancel
+	} else {
+		// MARKET order (default): Execute immediately at current price
+		orderService.Type(futures.OrderTypeMarket)
+	}
+
+	order, err := orderService.Do(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to place order: %v", err)
 	}
@@ -170,8 +187,26 @@ func (b *Client) placeTakeProfit(symbol, side, quantity string, tpPrice float64)
 
 // Calculate position quantity based on size and leverage
 func (b *Client) calculateQuantity(size, price float64, leverage int) string {
+	// Calculate quantity: (position size in USDT * leverage) / price
 	quantity := (size * float64(leverage)) / price
-	return fmt.Sprintf("%.3f", quantity)
+
+	// Round to reasonable precision based on quantity size
+	// Different symbols have different precision requirements:
+	// - BTC: 3 decimals (0.001)
+	// - XRP, ADA: 1 decimal (0.1)
+	// - TRX: 0 decimals (1)
+	var precision int
+	if quantity < 1 {
+		precision = 3 // Small quantities (BTC, ETH)
+	} else if quantity < 100 {
+		precision = 1 // Medium quantities (XRP, ADA, BNB)
+	} else {
+		precision = 0 // Large quantities (TRX, DOGE)
+	}
+
+	// Format with determined precision
+	formatStr := fmt.Sprintf("%%.%df", precision)
+	return fmt.Sprintf(formatStr, quantity)
 }
 
 // MonitorTrade - Monitor trade and update status in Firebase
@@ -208,7 +243,7 @@ func (b *Client) MonitorTrade(trade *models.Trade, fb interface {
 
 			// Stop monitoring if trade is closed
 			if order.Status == futures.OrderStatusTypeFilled ||
-			   order.Status == futures.OrderStatusTypeCanceled {
+				order.Status == futures.OrderStatusTypeCanceled {
 				log.Printf("Trade %s closed with status: %s", trade.ID, order.Status)
 				return
 			}

@@ -70,12 +70,19 @@ func TradeHandler(fb FirebaseInterface, bn BinanceInterface) gin.HandlerFunc {
 		// Generate unique trade ID
 		tradeID := uuid.New().String()
 
+		// Set default order type if not specified
+		orderType := req.OrderType
+		if orderType == "" {
+			orderType = "MARKET" // Default to MARKET order
+		}
+
 		// Create trade record
 		trade := &models.Trade{
 			ID:         tradeID,
 			UserID:     req.UserID,
 			Symbol:     req.Symbol,
 			Side:       req.Side,
+			OrderType:  orderType,
 			EntryPrice: req.EntryPrice,
 			StopLoss:   req.StopLoss,
 			TakeProfit: req.TakeProfit,

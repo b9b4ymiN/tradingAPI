@@ -52,6 +52,10 @@ definitions:
       orderId:
         example: 123456789
         type: integer
+      orderType:
+        description: MARKET or LIMIT
+        example: MARKET
+        type: string
       pnl:
         example: 250.75
         type: number
@@ -81,13 +85,19 @@ definitions:
   models.TradeRequest:
     properties:
       entryPrice:
+        description: Entry price
         example: 50000
         type: number
       leverage:
+        description: Leverage (1-125x)
         example: 10
         maximum: 125
         minimum: 1
         type: integer
+      orderType:
+        description: '"MARKET" or "LIMIT" (default: MARKET)'
+        example: MARKET
+        type: string
       side:
         description: '"BUY" or "SELL"'
         example: BUY
@@ -97,6 +107,7 @@ definitions:
         example: 1000
         type: number
       stopLoss:
+        description: Stop loss price
         example: 49000
         type: number
       symbol:
@@ -104,6 +115,7 @@ definitions:
         example: BTCUSDT
         type: string
       takeProfit:
+        description: Take profit price
         example: 52000
         type: number
       userId:
@@ -152,6 +164,48 @@ info:
   title: Crypto Trading API
   version: "1.0"
 paths:
+  /api/account/snapshot:
+    get:
+      description: Retrieve daily snapshots of Futures account balance and positions
+        (historical data, 7-30 days)
+      parameters:
+      - description: Start time (Unix timestamp in milliseconds)
+        in: query
+        name: startTime
+        type: integer
+      - description: End time (Unix timestamp in milliseconds)
+        in: query
+        name: endTime
+        type: integer
+      - description: Number of days (7-30, default 7)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Account snapshot retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.TradeResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized - Invalid API key
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "500":
+          description: Failed to get account snapshot
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get account snapshot
+      tags:
+      - Account
   /api/balance:
     get:
       description: Retrieve current account balance and asset information from Binance
@@ -180,6 +234,41 @@ paths:
       summary: Get account balance
       tags:
       - Account
+  /api/exchange/info:
+    get:
+      description: Retrieve trading rules, minimum order sizes, and symbol information
+        from Binance
+      parameters:
+      - description: Filter by specific symbol (e.g., BTCUSDT). If not provided, returns
+          all symbols.
+        in: query
+        name: symbol
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Exchange info retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.TradeResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized - Invalid API key
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "500":
+          description: Failed to get exchange info
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get exchange info
+      tags:
+      - Exchange
   /api/orders:
     get:
       description: Retrieve all pending orders, optionally filtered by symbol

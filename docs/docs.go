@@ -22,6 +22,75 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/account/snapshot": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve daily snapshots of Futures account balance and positions (historical data, 7-30 days)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Account"
+                ],
+                "summary": "Get account snapshot",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Start time (Unix timestamp in milliseconds)",
+                        "name": "startTime",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "End time (Unix timestamp in milliseconds)",
+                        "name": "endTime",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of days (7-30, default 7)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Account snapshot retrieved successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.TradeResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Invalid API key",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get account snapshot",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/balance": {
             "get": {
                 "security": [
@@ -64,6 +133,63 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Failed to get account balance",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/exchange/info": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Retrieve trading rules, minimum order sizes, and symbol information from Binance",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Exchange"
+                ],
+                "summary": "Get exchange info",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by specific symbol (e.g., BTCUSDT). If not provided, returns all symbols.",
+                        "name": "symbol",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Exchange info retrieved successfully",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.TradeResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - Invalid API key",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get exchange info",
                         "schema": {
                             "$ref": "#/definitions/models.TradeResponse"
                         }
@@ -690,6 +816,11 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 123456789
                 },
+                "orderType": {
+                    "description": "MARKET or LIMIT",
+                    "type": "string",
+                    "example": "MARKET"
+                },
                 "pnl": {
                     "type": "number",
                     "example": 250.75
@@ -739,14 +870,21 @@ const docTemplate = `{
             ],
             "properties": {
                 "entryPrice": {
+                    "description": "Entry price",
                     "type": "number",
                     "example": 50000
                 },
                 "leverage": {
+                    "description": "Leverage (1-125x)",
                     "type": "integer",
                     "maximum": 125,
                     "minimum": 1,
                     "example": 10
+                },
+                "orderType": {
+                    "description": "\"MARKET\" or \"LIMIT\" (default: MARKET)",
+                    "type": "string",
+                    "example": "MARKET"
                 },
                 "side": {
                     "description": "\"BUY\" or \"SELL\"",
@@ -759,6 +897,7 @@ const docTemplate = `{
                     "example": 1000
                 },
                 "stopLoss": {
+                    "description": "Stop loss price",
                     "type": "number",
                     "example": 49000
                 },
@@ -768,6 +907,7 @@ const docTemplate = `{
                     "example": "BTCUSDT"
                 },
                 "takeProfit": {
+                    "description": "Take profit price",
                     "type": "number",
                     "example": 52000
                 },

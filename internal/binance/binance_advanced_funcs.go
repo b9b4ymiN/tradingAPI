@@ -2,8 +2,17 @@ package binance
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
 	"strconv"
+	"time"
 
 	"github.com/adshao/go-binance/v2/futures"
 )
@@ -368,4 +377,253 @@ func (b *Client) GetIncomeHistory(symbol string, startTime, endTime int64) (floa
 	}
 
 	return totalPnL, nil
+}
+
+// SymbolInfo represents trading rules for a symbol
+type SymbolInfo struct {
+	Symbol              string  `json:"symbol"`
+	Status              string  `json:"status"`
+	BaseAsset           string  `json:"baseAsset"`
+	QuoteAsset          string  `json:"quoteAsset"`
+	PricePrecision      int     `json:"pricePrecision"`
+	QuantityPrecision   int     `json:"quantityPrecision"`
+	MinQuantity         string  `json:"minQuantity"`
+	MaxQuantity         string  `json:"maxQuantity"`
+	StepSize            string  `json:"stepSize"`
+	MinNotional         string  `json:"minNotional"`
+	MinPrice            string  `json:"minPrice"`
+	MaxPrice            string  `json:"maxPrice"`
+	TickSize            string  `json:"tickSize"`
+}
+
+// ExchangeInfoResponse represents the exchange info response
+type ExchangeInfoResponse struct {
+	Timezone   string       `json:"timezone"`
+	ServerTime int64        `json:"serverTime"`
+	Symbols    []SymbolInfo `json:"symbols"`
+}
+
+// GetExchangeInfo - Get exchange trading rules and symbol information
+func (b *Client) GetExchangeInfo(symbol string) (*ExchangeInfoResponse, error) {
+	ctx := context.Background()
+
+	// Get exchange info from Binance
+	exchangeInfo, err := b.client.NewExchangeInfoService().Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get exchange info: %v", err)
+	}
+
+	response := &ExchangeInfoResponse{
+		Timezone:   exchangeInfo.Timezone,
+		ServerTime: exchangeInfo.ServerTime,
+		Symbols:    []SymbolInfo{},
+	}
+
+	// Process symbols
+	for _, s := range exchangeInfo.Symbols {
+		// If specific symbol requested, filter it
+		if symbol != "" && s.Symbol != symbol {
+			continue
+		}
+
+		// Extract filters
+		filters := make(map[string]map[string]interface{})
+		for _, filter := range s.Filters {
+			if filterType, ok := filter["filterType"].(string); ok {
+				filters[filterType] = filter
+			}
+		}
+
+		// Build symbol info
+		symbolInfo := SymbolInfo{
+			Symbol:            s.Symbol,
+			Status:            string(s.Status),
+			BaseAsset:         s.BaseAsset,
+			QuoteAsset:        s.QuoteAsset,
+			PricePrecision:    s.PricePrecision,
+			QuantityPrecision: s.QuantityPrecision,
+		}
+
+		// Extract LOT_SIZE filter (quantity rules)
+		if lotSize, ok := filters["LOT_SIZE"]; ok {
+			if minQty, exists := lotSize["minQty"]; exists {
+				if val, ok := minQty.(string); ok {
+					symbolInfo.MinQuantity = val
+				}
+			}
+			if maxQty, exists := lotSize["maxQty"]; exists {
+				if val, ok := maxQty.(string); ok {
+					symbolInfo.MaxQuantity = val
+				}
+			}
+			if stepSize, exists := lotSize["stepSize"]; exists {
+				if val, ok := stepSize.(string); ok {
+					symbolInfo.StepSize = val
+				}
+			}
+		}
+
+		// Extract PRICE_FILTER (price rules)
+		if priceFilter, ok := filters["PRICE_FILTER"]; ok {
+			if minPrice, exists := priceFilter["minPrice"]; exists {
+				if val, ok := minPrice.(string); ok {
+					symbolInfo.MinPrice = val
+				}
+			}
+			if maxPrice, exists := priceFilter["maxPrice"]; exists {
+				if val, ok := maxPrice.(string); ok {
+					symbolInfo.MaxPrice = val
+				}
+			}
+			if tickSize, exists := priceFilter["tickSize"]; exists {
+				if val, ok := tickSize.(string); ok {
+					symbolInfo.TickSize = val
+				}
+			}
+		}
+
+		// Extract MIN_NOTIONAL filter (minimum order value)
+		if minNotional, ok := filters["MIN_NOTIONAL"]; ok {
+			if notional, exists := minNotional["notional"]; exists {
+				if val, ok := notional.(string); ok {
+					symbolInfo.MinNotional = val
+				}
+			}
+		}
+
+		response.Symbols = append(response.Symbols, symbolInfo)
+	}
+
+	return response, nil
+}
+
+// AccountSnapshotAsset represents asset information in snapshot
+type AccountSnapshotAsset struct {
+	Asset              string  `json:"asset"`
+	MarginBalance      float64 `json:"marginBalance,string"`
+	WalletBalance      float64 `json:"walletBalance,string"`
+	UnrealizedProfit   float64 `json:"unrealizedProfit,string"`
+	AvailableBalance   float64 `json:"availableBalance,string"`
+	MaxWithdrawAmount  float64 `json:"maxWithdrawAmount,string"`
+}
+
+// AccountSnapshotPosition represents position information in snapshot
+type AccountSnapshotPosition struct {
+	Symbol           string  `json:"symbol"`
+	EntryPrice       float64 `json:"entryPrice,string"`
+	MarkPrice        float64 `json:"markPrice,string"`
+	PositionAmt      float64 `json:"positionAmt,string"`
+	UnrealizedProfit float64 `json:"unRealizedProfit,string"`
+	PositionSide     string  `json:"positionSide"`
+}
+
+// AccountSnapshotData represents snapshot data for a specific time
+type AccountSnapshotData struct {
+	Assets    []AccountSnapshotAsset    `json:"assets"`
+	Position  []AccountSnapshotPosition `json:"position"`
+	UpdateTime int64                    `json:"updateTime"`
+}
+
+// AccountSnapshot represents a single snapshot entry
+type AccountSnapshot struct {
+	Type       string              `json:"type"`
+	UpdateTime int64               `json:"updateTime"`
+	Data       AccountSnapshotData `json:"data"`
+}
+
+// AccountSnapshotResponse represents the full snapshot response
+type AccountSnapshotResponse struct {
+	Code         int               `json:"code"`
+	Msg          string            `json:"msg"`
+	SnapshotVos  []AccountSnapshot `json:"snapshotVos"`
+}
+
+// GetAccountSnapshot - Get daily account snapshot (Futures)
+// This retrieves historical snapshots of your Futures account balance and positions
+func (b *Client) GetAccountSnapshot(startTime, endTime int64, limit int) (*AccountSnapshotResponse, error) {
+	// Get API credentials from environment
+	apiKey := os.Getenv("BINANCE_API_KEY")
+	secretKey := os.Getenv("BINANCE_SECRET_KEY")
+
+	if apiKey == "" || secretKey == "" {
+		return nil, fmt.Errorf("Binance API credentials not found")
+	}
+
+	// Determine base URL (testnet or production)
+	baseURL := "https://api.binance.com"
+	if os.Getenv("BINANCE_TESTNET") == "true" {
+		// Note: Testnet uses different endpoint
+		baseURL = "https://testnet.binance.vision"
+	}
+
+	// Build query parameters
+	params := url.Values{}
+	params.Set("type", "FUTURES")
+
+	if limit <= 0 {
+		limit = 7 // Default 7 days
+	}
+	if limit > 30 {
+		limit = 30 // Max 30 days
+	}
+	params.Set("limit", strconv.Itoa(limit))
+
+	if startTime > 0 {
+		params.Set("startTime", strconv.FormatInt(startTime, 10))
+	}
+	if endTime > 0 {
+		params.Set("endTime", strconv.FormatInt(endTime, 10))
+	}
+
+	// Add timestamp
+	timestamp := time.Now().UnixMilli()
+	params.Set("timestamp", strconv.FormatInt(timestamp, 10))
+
+	// Create signature
+	queryString := params.Encode()
+	h := hmac.New(sha256.New, []byte(secretKey))
+	h.Write([]byte(queryString))
+	signature := hex.EncodeToString(h.Sum(nil))
+
+	// Add signature to query
+	params.Set("signature", signature)
+
+	// Build full URL
+	fullURL := fmt.Sprintf("%s/sapi/v1/accountSnapshot?%s", baseURL, params.Encode())
+
+	// Create HTTP request
+	req, err := http.NewRequest("GET", fullURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %v", err)
+	}
+
+	// Add API key header
+	req.Header.Set("X-MBX-APIKEY", apiKey)
+
+	// Execute request
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Read response body
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %v", err)
+	}
+
+	// Check for HTTP errors
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("Binance API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	// Parse response
+	var result AccountSnapshotResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	return &result, nil
 }

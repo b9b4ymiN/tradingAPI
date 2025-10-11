@@ -6,6 +6,7 @@ type Trade struct {
 	UserID        string  `json:"userId" example:"user123"`
 	Symbol        string  `json:"symbol" example:"BTCUSDT"`
 	Side          string  `json:"side" example:"BUY"`
+	OrderType     string  `json:"orderType,omitempty" example:"MARKET"` // MARKET or LIMIT
 	EntryPrice    float64 `json:"entryPrice" example:"50000.00"`
 	ExecutedPrice float64 `json:"executedPrice,omitempty" example:"50100.50"`
 	StopLoss      float64 `json:"stopLoss" example:"49000.00"`
@@ -24,13 +25,14 @@ type Trade struct {
 // TradeRequest represents incoming trade order
 type TradeRequest struct {
 	UserID     string  `json:"userId" binding:"required" example:"user123"`
-	Symbol     string  `json:"symbol" binding:"required" example:"BTCUSDT"` // e.g., "BTCUSDT"
-	Side       string  `json:"side" binding:"required" example:"BUY"`       // "BUY" or "SELL"
-	EntryPrice float64 `json:"entryPrice" binding:"required" example:"50000.00"`
-	StopLoss   float64 `json:"stopLoss" binding:"required" example:"49000.00"`
-	TakeProfit float64 `json:"takeProfit" binding:"required" example:"52000.00"`
-	Leverage   int     `json:"leverage" binding:"required,min=1,max=125" example:"10"`
-	Size       float64 `json:"size" binding:"required,gt=0" example:"1000.00"` // Position size in USDT
+	Symbol     string  `json:"symbol" binding:"required" example:"BTCUSDT"`         // e.g., "BTCUSDT"
+	Side       string  `json:"side" binding:"required" example:"BUY"`               // "BUY" or "SELL"
+	EntryPrice float64 `json:"entryPrice" binding:"required" example:"50000.00"`    // Entry price
+	StopLoss   float64 `json:"stopLoss" binding:"required" example:"49000.00"`      // Stop loss price
+	TakeProfit float64 `json:"takeProfit" binding:"required" example:"52000.00"`    // Take profit price
+	Leverage   int     `json:"leverage" binding:"required,min=1,max=125" example:"10"` // Leverage (1-125x)
+	Size       float64 `json:"size" binding:"required,gt=0" example:"1000.00"`      // Position size in USDT
+	OrderType  string  `json:"orderType,omitempty" example:"MARKET"`                // "MARKET" or "LIMIT" (default: MARKET)
 }
 
 // TradeResponse represents API response
