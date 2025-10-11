@@ -10,8 +10,9 @@ import (
 // Config holds all application configuration
 type Config struct {
 	// Server
-	Port    string
-	GinMode string
+	Port        string
+	GinMode     string
+	SwaggerHost string
 
 	// Security
 	APIKey string
@@ -21,7 +22,7 @@ type Config struct {
 	BinanceSecretKey string
 
 	// Firebase
-	FirebaseDBURL         string
+	FirebaseDBURL           string
 	FirebaseCredentialsFile string
 }
 
@@ -34,8 +35,9 @@ func Load() *Config {
 
 	config := &Config{
 		// Server
-		Port:    getEnv("PORT", "8080"),
-		GinMode: getEnv("GIN_MODE", "release"),
+		Port:        getEnv("PORT", "8080"),
+		GinMode:     getEnv("GIN_MODE", "release"),
+		SwaggerHost: getEnv("SWAGGER_HOST", "localhost:8080"),
 
 		// Security
 		APIKey: getEnv("API_KEY", ""),
@@ -45,7 +47,7 @@ func Load() *Config {
 		BinanceSecretKey: getEnv("BINANCE_SECRET_KEY", ""),
 
 		// Firebase
-		FirebaseDBURL:         getEnv("FIREBASE_DATABASE_URL", ""),
+		FirebaseDBURL:           getEnv("FIREBASE_DATABASE_URL", ""),
 		FirebaseCredentialsFile: getEnv("FIREBASE_CREDENTIALS_FILE", ""),
 	}
 

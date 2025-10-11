@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto-trading-api/config"
 	_ "crypto-trading-api/docs" // Import generated Swagger docs
+	docs "crypto-trading-api/docs"
 	"crypto-trading-api/internal/api"
 	"crypto-trading-api/internal/binance"
 	"crypto-trading-api/internal/firebase"
@@ -63,6 +64,10 @@ func main() {
 
 	// Set Gin mode
 	gin.SetMode(cfg.GinMode)
+
+	// Configure Swagger info
+	docs.SwaggerInfo.Host = cfg.SwaggerHost
+	docs.SwaggerInfo.Schemes = []string{"http", "https"}
 
 	// Initialize Firebase
 	firebaseClient, err := firebase.InitClient()
