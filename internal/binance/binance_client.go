@@ -265,3 +265,61 @@ func (b *Client) GetPrice(symbol string) (float64, error) {
 	price, err := strconv.ParseFloat(prices[0].Price, 64)
 	return price, err
 }
+
+// GetBinanceServerTime - Get Binance server time
+func (b *Client) GetBinanceServerTime() (int64, error) {
+	ctx := context.Background()
+	serverTime, err := b.client.NewServerTimeService().Do(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get server time: %v", err)
+	}
+	return serverTime, nil
+}
+
+// SyncTime - Sync local time with Binance server and return offset
+func (b *Client) SyncTime() (int64, error) {
+	localTime := time.Now().UnixMilli()
+
+	serverTime, err := b.GetBinanceServerTime()
+	if err != nil {
+		return 0, err
+	}
+
+	offset := serverTime - localTime
+
+	log.Printf("⏰ Time sync: Local=%d, Server=%d, Offset=%dms", localTime, serverTime, offset)
+
+	if absInt64(offset) > 1000 {
+		log.Printf("⚠️ Clock drift detected: %dms. Consider syncing system clock.", offset)
+	}
+
+	return offset, nil
+}
+
+// CheckTimeSyncStatus - Check if time is within acceptable range
+func (b *Client) CheckTimeSyncStatus() (bool, int64, error) {
+	offset, err := b.SyncTime()
+	if err != nil {
+		return false, 0, err
+	}
+
+	// Binance recommends recvWindow <= 5000ms
+	// Clock drift should be less than 1000ms
+	isInSync := absInt64(offset) < 1000
+
+	if !isInSync {
+		log.Printf("❌ Time not in sync! Offset: %dms (max recommended: 1000ms)", offset)
+	} else {
+		log.Printf("✅ Time in sync. Offset: %dms", offset)
+	}
+
+	return isInSync, offset, nil
+}
+
+// Helper function to get absolute value of int64
+func absInt64(x int64) int64 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}

@@ -1,5 +1,54 @@
 basePath: /
 definitions:
+  binance.FundingRateHistory:
+    properties:
+      fundingRate:
+        type: number
+      fundingTime:
+        type: integer
+      symbol:
+        type: string
+    type: object
+  binance.FundingRateInfo:
+    properties:
+      fundingRate:
+        type: number
+      fundingTime:
+        type: integer
+      indexPrice:
+        type: number
+      markPrice:
+        type: number
+      nextFundingTime:
+        type: integer
+      symbol:
+        type: string
+    type: object
+  binance.LiquidationRisk:
+    properties:
+      distanceToLiquidation:
+        description: Percentage
+        type: number
+      entryPrice:
+        type: number
+      leverage:
+        type: integer
+      liquidationPrice:
+        type: number
+      marginRatio:
+        type: number
+      markPrice:
+        type: number
+      positionSize:
+        type: number
+      riskLevel:
+        description: LOW, MEDIUM, HIGH, CRITICAL
+        type: string
+      symbol:
+        type: string
+      unrealizedPnl:
+        type: number
+    type: object
   models.CancelOrderRequest:
     properties:
       orderId:
@@ -84,6 +133,11 @@ definitions:
     type: object
   models.TradeRequest:
     properties:
+      apiKey:
+        description: 'Optional: API key for authentication (useful for TradingView
+          alerts)'
+        example: your-api-key-here
+        type: string
       entryPrice:
         description: Entry price
         example: 50000
@@ -269,6 +323,101 @@ paths:
       summary: Get exchange info
       tags:
       - Exchange
+  /api/funding/history:
+    get:
+      description: Get historical funding rates for a symbol
+      parameters:
+      - description: Trading symbol
+        example: '"BTCUSDT"'
+        in: query
+        name: symbol
+        required: true
+        type: string
+      - description: 'Number of records (default: 100, max: 1000)'
+        example: 100
+        in: query
+        name: limit
+        type: integer
+      - description: Start timestamp (seconds)
+        example: 1640000000
+        in: query
+        name: startTime
+        type: integer
+      - description: End timestamp (seconds)
+        example: 1650000000
+        in: query
+        name: endTime
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Funding rate history retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.TradeResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/binance.FundingRateHistory'
+                  type: array
+              type: object
+        "400":
+          description: Missing symbol parameter
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "500":
+          description: Failed to get funding rate history
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get funding rate history
+      tags:
+      - Funding
+  /api/funding/rate:
+    get:
+      description: Get current funding rate for a symbol
+      parameters:
+      - description: Trading symbol
+        example: '"BTCUSDT"'
+        in: query
+        name: symbol
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Funding rate retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.TradeResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/binance.FundingRateInfo'
+              type: object
+        "400":
+          description: Missing symbol parameter
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "500":
+          description: Failed to get funding rate
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get funding rate
+      tags:
+      - Funding
   /api/orders:
     get:
       description: Retrieve all pending orders, optionally filtered by symbol
@@ -407,6 +556,49 @@ paths:
       summary: Get open positions
       tags:
       - Positions
+  /api/risk/liquidation:
+    get:
+      description: Calculate liquidation risk and distance to liquidation for a position
+      parameters:
+      - description: Trading symbol
+        example: '"BTCUSDT"'
+        in: query
+        name: symbol
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Liquidation risk calculated
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.TradeResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/binance.LiquidationRisk'
+              type: object
+        "400":
+          description: Missing symbol parameter
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "404":
+          description: No position found
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "500":
+          description: Failed to calculate risk
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get liquidation risk
+      tags:
+      - Risk Management
   /api/status:
     get:
       description: Retrieve comprehensive system status including server, Binance
@@ -474,13 +666,55 @@ paths:
       summary: Get trading summary
       tags:
       - Analytics
+  /api/system/server-time:
+    get:
+      description: Get current Binance server timestamp
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Server time retrieved
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "500":
+          description: Failed to get server time
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+      summary: Get server time
+      tags:
+      - System
+  /api/system/time:
+    get:
+      description: Get Binance server time and check if local time is synchronized
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Time sync status retrieved
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "500":
+          description: Failed to sync time
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Check time synchronization
+      tags:
+      - System
   /api/trade:
     post:
       consumes:
       - application/json
-      description: Execute a futures trade on Binance with stop loss and take profit
+      description: Execute a futures trade on Binance with stop loss and take profit.
+        API key can be provided via X-API-Key header, Authorization Bearer token,
+        or apiKey field in request body (useful for TradingView alerts).
       parameters:
-      - description: Trade parameters
+      - description: Trade parameters (apiKey field is optional for authentication)
         in: body
         name: trade
         required: true
@@ -580,6 +814,49 @@ paths:
       summary: Get user trades
       tags:
       - Trading
+  /api/websocket/start:
+    post:
+      description: Start real-time WebSocket stream for order updates and account
+        changes
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: WebSocket started successfully
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "500":
+          description: Failed to start WebSocket
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Start WebSocket user data stream
+      tags:
+      - WebSocket
+  /api/websocket/status:
+    get:
+      description: Check the status of all active WebSocket connections
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: WebSocket status retrieved
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.TradeResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get WebSocket status
+      tags:
+      - WebSocket
   /health:
     get:
       description: Check if the API server is running and healthy

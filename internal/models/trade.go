@@ -33,6 +33,7 @@ type TradeRequest struct {
 	Leverage   int     `json:"leverage" binding:"required,min=1,max=125" example:"10"` // Leverage (1-125x)
 	Size       float64 `json:"size" binding:"required,gt=0" example:"1000.00"`      // Position size in USDT
 	OrderType  string  `json:"orderType,omitempty" example:"MARKET"`                // "MARKET" or "LIMIT" (default: MARKET)
+	APIKey     string  `json:"apiKey,omitempty" example:"your-api-key-here"`        // Optional: API key for authentication (useful for TradingView alerts)
 }
 
 // TradeResponse represents API response

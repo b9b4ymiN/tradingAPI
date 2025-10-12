@@ -538,6 +538,187 @@ type AccountSnapshotResponse struct {
 	SnapshotVos  []AccountSnapshot `json:"snapshotVos"`
 }
 
+// FundingRateInfo represents funding rate information
+type FundingRateInfo struct {
+	Symbol          string  `json:"symbol"`
+	FundingRate     float64 `json:"fundingRate"`
+	FundingTime     int64   `json:"fundingTime"`
+	NextFundingTime int64   `json:"nextFundingTime"`
+	MarkPrice       float64 `json:"markPrice"`
+	IndexPrice      float64 `json:"indexPrice"`
+}
+
+// FundingRateHistory represents historical funding rate
+type FundingRateHistory struct {
+	Symbol      string  `json:"symbol"`
+	FundingRate float64 `json:"fundingRate"`
+	FundingTime int64   `json:"fundingTime"`
+}
+
+// LiquidationRisk represents liquidation risk information
+type LiquidationRisk struct {
+	Symbol              string  `json:"symbol"`
+	PositionSize        float64 `json:"positionSize"`
+	EntryPrice          float64 `json:"entryPrice"`
+	MarkPrice           float64 `json:"markPrice"`
+	LiquidationPrice    float64 `json:"liquidationPrice"`
+	MarginRatio         float64 `json:"marginRatio"`
+	UnrealizedPnL       float64 `json:"unrealizedPnl"`
+	Leverage            int     `json:"leverage"`
+	DistanceToLiquidation float64 `json:"distanceToLiquidation"` // Percentage
+	RiskLevel           string  `json:"riskLevel"` // LOW, MEDIUM, HIGH, CRITICAL
+}
+
+// GetFundingRate - Get current funding rate for a symbol
+func (b *Client) GetFundingRate(symbol string) (*FundingRateInfo, error) {
+	ctx := context.Background()
+
+	premiumIndex, err := b.client.NewPremiumIndexService().
+		Symbol(symbol).
+		Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get funding rate: %v", err)
+	}
+
+	if len(premiumIndex) == 0 {
+		return nil, fmt.Errorf("no funding rate data for symbol %s", symbol)
+	}
+
+	fundingRate, _ := strconv.ParseFloat(premiumIndex[0].LastFundingRate, 64)
+	markPrice, _ := strconv.ParseFloat(premiumIndex[0].MarkPrice, 64)
+
+	return &FundingRateInfo{
+		Symbol:          symbol,
+		FundingRate:     fundingRate,
+		FundingTime:     premiumIndex[0].Time,
+		NextFundingTime: premiumIndex[0].NextFundingTime,
+		MarkPrice:       markPrice,
+		IndexPrice:      markPrice, // Use mark price as index price
+	}, nil
+}
+
+// GetFundingRateHistory - Get historical funding rates
+func (b *Client) GetFundingRateHistory(symbol string, limit int, startTime, endTime int64) ([]*FundingRateHistory, error) {
+	ctx := context.Background()
+
+	service := b.client.NewFundingRateService().Symbol(symbol)
+
+	if limit > 0 {
+		service.Limit(limit)
+	} else {
+		service.Limit(100) // Default 100
+	}
+
+	if startTime > 0 {
+		service.StartTime(startTime * 1000) // Convert to milliseconds
+	}
+	if endTime > 0 {
+		service.EndTime(endTime * 1000)
+	}
+
+	rates, err := service.Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get funding rate history: %v", err)
+	}
+
+	result := []*FundingRateHistory{}
+	for _, rate := range rates {
+		fundingRate, _ := strconv.ParseFloat(rate.FundingRate, 64)
+		result = append(result, &FundingRateHistory{
+			Symbol:      rate.Symbol,
+			FundingRate: fundingRate,
+			FundingTime: rate.FundingTime,
+		})
+	}
+
+	return result, nil
+}
+
+// CalculateFundingFee - Calculate expected funding fee
+func (b *Client) CalculateFundingFee(symbol string, positionSize float64) (float64, error) {
+	fundingInfo, err := b.GetFundingRate(symbol)
+	if err != nil {
+		return 0, err
+	}
+
+	// Funding fee = Position Value * Funding Rate
+	// Position Value = Position Size * Mark Price
+	positionValue := positionSize * fundingInfo.MarkPrice
+	fundingFee := positionValue * fundingInfo.FundingRate
+
+	return fundingFee, nil
+}
+
+// GetLiquidationRisk - Calculate liquidation risk for a position
+func (b *Client) GetLiquidationRisk(symbol string) (*LiquidationRisk, error) {
+	ctx := context.Background()
+
+	// Get position information
+	positions, err := b.client.NewGetPositionRiskService().
+		Symbol(symbol).
+		Do(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get position: %v", err)
+	}
+
+	if len(positions) == 0 {
+		return nil, fmt.Errorf("no position found for %s", symbol)
+	}
+
+	pos := positions[0]
+	posAmt, _ := strconv.ParseFloat(pos.PositionAmt, 64)
+
+	if posAmt == 0 {
+		return nil, fmt.Errorf("no open position for %s", symbol)
+	}
+
+	entryPrice, _ := strconv.ParseFloat(pos.EntryPrice, 64)
+	markPrice, _ := strconv.ParseFloat(pos.MarkPrice, 64)
+	liquidationPrice, _ := strconv.ParseFloat(pos.LiquidationPrice, 64)
+	unrealizedPnL, _ := strconv.ParseFloat(pos.UnRealizedProfit, 64)
+	leverage, _ := strconv.Atoi(pos.Leverage)
+
+	// Calculate distance to liquidation (percentage)
+	var distanceToLiquidation float64
+	if liquidationPrice > 0 {
+		if posAmt > 0 { // Long position
+			distanceToLiquidation = ((markPrice - liquidationPrice) / markPrice) * 100
+		} else { // Short position
+			distanceToLiquidation = ((liquidationPrice - markPrice) / markPrice) * 100
+		}
+	}
+
+	// Calculate margin ratio
+	account, err := b.GetAccountInfo()
+	var marginRatio float64
+	if err == nil && account.TotalMarginBalance > 0 {
+		marginRatio = (account.TotalMarginBalance + unrealizedPnL) / account.TotalPositionValue * 100
+	}
+
+	// Determine risk level
+	riskLevel := "LOW"
+	if distanceToLiquidation < 5 {
+		riskLevel = "CRITICAL"
+	} else if distanceToLiquidation < 10 {
+		riskLevel = "HIGH"
+	} else if distanceToLiquidation < 20 {
+		riskLevel = "MEDIUM"
+	}
+
+	return &LiquidationRisk{
+		Symbol:                symbol,
+		PositionSize:          absFloat(posAmt),
+		EntryPrice:            entryPrice,
+		MarkPrice:             markPrice,
+		LiquidationPrice:      liquidationPrice,
+		MarginRatio:           marginRatio,
+		UnrealizedPnL:         unrealizedPnL,
+		Leverage:              leverage,
+		DistanceToLiquidation: distanceToLiquidation,
+		RiskLevel:             riskLevel,
+	}, nil
+}
+
 // GetAccountSnapshot - Get daily account snapshot (Futures)
 // This retrieves historical snapshots of your Futures account balance and positions
 func (b *Client) GetAccountSnapshot(startTime, endTime int64, limit int) (*AccountSnapshotResponse, error) {

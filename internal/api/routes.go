@@ -43,6 +43,22 @@ func SetupRouter(fb *firebase.Client, bn *binance.Client) *gin.Engine {
 		apiGroup.GET("/summary", TradingSummaryHandler(fb, bn))        // Trading summary
 		apiGroup.GET("/exchange/info", ExchangeInfoHandler(bn))        // Exchange info (min trade sizes, etc.)
 		apiGroup.GET("/account/snapshot", AccountSnapshotHandler(bn))  // Daily account snapshot
+
+		// 🆕 CRITICAL FEATURES - WebSocket, Funding, Risk, Time Sync
+		// WebSocket endpoints
+		apiGroup.POST("/websocket/start", StartWebSocketHandler(bn))   // Start WebSocket stream
+		apiGroup.GET("/websocket/status", WebSocketStatusHandler())    // WebSocket status
+
+		// Funding rate endpoints
+		apiGroup.GET("/funding/rate", FundingRateHandler(bn))          // Current funding rate
+		apiGroup.GET("/funding/history", FundingRateHistoryHandler(bn)) // Funding rate history
+
+		// Risk management endpoints
+		apiGroup.GET("/risk/liquidation", LiquidationRiskHandler(bn))  // Liquidation risk analysis
+
+		// System/Time sync endpoints
+		apiGroup.GET("/system/time", TimeSyncHandler(bn))              // Time synchronization check
+		apiGroup.GET("/system/server-time", ServerTimeHandler(bn))     // Binance server time
 	}
 
 	return router

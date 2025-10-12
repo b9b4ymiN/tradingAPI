@@ -197,6 +197,160 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/funding/history": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get historical funding rates for a symbol",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Funding"
+                ],
+                "summary": "Get funding rate history",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "\"BTCUSDT\"",
+                        "description": "Trading symbol",
+                        "name": "symbol",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "example": 100,
+                        "description": "Number of records (default: 100, max: 1000)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "example": 1640000000,
+                        "description": "Start timestamp (seconds)",
+                        "name": "startTime",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "example": 1650000000,
+                        "description": "End timestamp (seconds)",
+                        "name": "endTime",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Funding rate history retrieved",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.TradeResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/binance.FundingRateHistory"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Missing symbol parameter",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get funding rate history",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/funding/rate": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get current funding rate for a symbol",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Funding"
+                ],
+                "summary": "Get funding rate",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "\"BTCUSDT\"",
+                        "description": "Trading symbol",
+                        "name": "symbol",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Funding rate retrieved",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.TradeResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/binance.FundingRateInfo"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Missing symbol parameter",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get funding rate",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/orders": {
             "get": {
                 "security": [
@@ -434,6 +588,77 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/risk/liquidation": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Calculate liquidation risk and distance to liquidation for a position",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Risk Management"
+                ],
+                "summary": "Get liquidation risk",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "\"BTCUSDT\"",
+                        "description": "Trading symbol",
+                        "name": "symbol",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liquidation risk calculated",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/models.TradeResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/binance.LiquidationRisk"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Missing symbol parameter",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "No position found",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to calculate risk",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/status": {
             "get": {
                 "security": [
@@ -546,6 +771,69 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/system/server-time": {
+            "get": {
+                "description": "Get current Binance server timestamp",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Get server time",
+                "responses": {
+                    "200": {
+                        "description": "Server time retrieved",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to get server time",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/system/time": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Get Binance server time and check if local time is synchronized",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Check time synchronization",
+                "responses": {
+                    "200": {
+                        "description": "Time sync status retrieved",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to sync time",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/trade": {
             "post": {
                 "security": [
@@ -553,7 +841,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "Execute a futures trade on Binance with stop loss and take profit",
+                "description": "Execute a futures trade on Binance with stop loss and take profit. API key can be provided via X-API-Key header, Authorization Bearer token, or apiKey field in request body (useful for TradingView alerts).",
                 "consumes": [
                     "application/json"
                 ],
@@ -566,7 +854,7 @@ const docTemplate = `{
                 "summary": "Execute a new trade",
                 "parameters": [
                     {
-                        "description": "Trade parameters",
+                        "description": "Trade parameters (apiKey field is optional for authentication)",
                         "name": "trade",
                         "in": "body",
                         "required": true,
@@ -722,6 +1010,74 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/websocket/start": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Start real-time WebSocket stream for order updates and account changes",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "WebSocket"
+                ],
+                "summary": "Start WebSocket user data stream",
+                "responses": {
+                    "200": {
+                        "description": "WebSocket started successfully",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Failed to start WebSocket",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/websocket/status": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Check the status of all active WebSocket connections",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "WebSocket"
+                ],
+                "summary": "Get WebSocket status",
+                "responses": {
+                    "200": {
+                        "description": "WebSocket status retrieved",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.TradeResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "description": "Check if the API server is running and healthy",
@@ -745,6 +1101,80 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "binance.FundingRateHistory": {
+            "type": "object",
+            "properties": {
+                "fundingRate": {
+                    "type": "number"
+                },
+                "fundingTime": {
+                    "type": "integer"
+                },
+                "symbol": {
+                    "type": "string"
+                }
+            }
+        },
+        "binance.FundingRateInfo": {
+            "type": "object",
+            "properties": {
+                "fundingRate": {
+                    "type": "number"
+                },
+                "fundingTime": {
+                    "type": "integer"
+                },
+                "indexPrice": {
+                    "type": "number"
+                },
+                "markPrice": {
+                    "type": "number"
+                },
+                "nextFundingTime": {
+                    "type": "integer"
+                },
+                "symbol": {
+                    "type": "string"
+                }
+            }
+        },
+        "binance.LiquidationRisk": {
+            "type": "object",
+            "properties": {
+                "distanceToLiquidation": {
+                    "description": "Percentage",
+                    "type": "number"
+                },
+                "entryPrice": {
+                    "type": "number"
+                },
+                "leverage": {
+                    "type": "integer"
+                },
+                "liquidationPrice": {
+                    "type": "number"
+                },
+                "marginRatio": {
+                    "type": "number"
+                },
+                "markPrice": {
+                    "type": "number"
+                },
+                "positionSize": {
+                    "type": "number"
+                },
+                "riskLevel": {
+                    "description": "LOW, MEDIUM, HIGH, CRITICAL",
+                    "type": "string"
+                },
+                "symbol": {
+                    "type": "string"
+                },
+                "unrealizedPnl": {
+                    "type": "number"
+                }
+            }
+        },
         "models.CancelOrderRequest": {
             "type": "object",
             "properties": {
@@ -869,6 +1299,11 @@ const docTemplate = `{
                 "userId"
             ],
             "properties": {
+                "apiKey": {
+                    "description": "Optional: API key for authentication (useful for TradingView alerts)",
+                    "type": "string",
+                    "example": "your-api-key-here"
+                },
                 "entryPrice": {
                     "description": "Entry price",
                     "type": "number",

@@ -112,11 +112,27 @@ Complete API documentation available at: `/swagger/index.html`
 
 ### Authentication
 
-All API requests (except `/health`) require authentication via API key in the request header:
+All API requests (except `/health`) require authentication via API key. The API key can be provided in three ways:
 
+**Method 1: X-API-Key Header**
 ```http
 X-API-Key: <your-api-key>
 ```
+
+**Method 2: Authorization Bearer Token**
+```http
+Authorization: Bearer <your-api-key>
+```
+
+**Method 3: Request Body (TradingView Compatible)**
+```json
+{
+  "apiKey": "<your-api-key>",
+  ...other parameters
+}
+```
+
+Note: Method 3 (request body) is only supported for the `/api/trade` endpoint and is specifically designed for TradingView webhook alerts that don't support custom headers.
 
 ### Execute Market Order
 
@@ -184,6 +200,54 @@ curl -X GET "http://localhost:8080/api/exchange/info?symbol=BTCUSDT" \
 ```bash
 curl -X GET "http://localhost:8080/api/account/snapshot?limit=7" \
   -H "X-API-Key: <your-api-key>"
+```
+
+### TradingView Integration
+
+This API supports TradingView webhook alerts. Since TradingView doesn't allow custom headers, you can include the API key directly in the webhook message body.
+
+**Setup Steps:**
+
+1. Create an alert in TradingView
+2. Configure webhook URL: `https://your-domain.com/api/trade`
+3. Set webhook message body:
+
+```json
+{
+  "apiKey": "your-api-key-here",
+  "userId": "tradingview_user",
+  "symbol": "{{ticker}}",
+  "side": "{{strategy.order.action}}",
+  "entryPrice": {{close}},
+  "stopLoss": {{strategy.order.stop_loss}},
+  "takeProfit": {{strategy.order.take_profit}},
+  "leverage": 10,
+  "size": 100.00,
+  "orderType": "MARKET"
+}
+```
+
+**TradingView Variables:**
+- `{{ticker}}` - Symbol (e.g., BTCUSDT)
+- `{{strategy.order.action}}` - BUY or SELL
+- `{{close}}` - Current close price
+- Custom stop loss/take profit based on your strategy
+
+**Example with Fixed Values:**
+
+```json
+{
+  "apiKey": "your-api-key-here",
+  "userId": "tradingview_bot",
+  "symbol": "BTCUSDT",
+  "side": "BUY",
+  "entryPrice": 50000.00,
+  "stopLoss": 49000.00,
+  "takeProfit": 52000.00,
+  "leverage": 10,
+  "size": 100.00,
+  "orderType": "MARKET"
+}
 ```
 
 ---

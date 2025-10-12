@@ -30,12 +30,12 @@ type BinanceInterface interface {
 
 // TradeHandler - Main function to handle trade requests
 // @Summary      Execute a new trade
-// @Description  Execute a futures trade on Binance with stop loss and take profit
+// @Description  Execute a futures trade on Binance with stop loss and take profit. API key can be provided via X-API-Key header, Authorization Bearer token, or apiKey field in request body (useful for TradingView alerts).
 // @Tags         Trading
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        trade  body      models.TradeRequest  true  "Trade parameters"
+// @Param        trade  body      models.TradeRequest  true  "Trade parameters (apiKey field is optional for authentication)"
 // @Success      200    {object}  models.TradeResponse  "Trade executed successfully"
 // @Failure      400    {object}  models.TradeResponse  "Invalid request or trade parameters"
 // @Failure      401    {object}  models.TradeResponse  "Unauthorized - Invalid API key"

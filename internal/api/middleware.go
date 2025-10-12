@@ -1,6 +1,9 @@
 package api
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -38,7 +41,7 @@ func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get API key from header
 		requestKey := c.GetHeader("X-API-Key")
-		
+
 		// Also check Authorization header (Bearer token)
 		if requestKey == "" {
 			authHeader := c.GetHeader("Authorization")
@@ -47,11 +50,31 @@ func AuthMiddleware() gin.HandlerFunc {
 			}
 		}
 
+		// For /trade endpoint, also check request body for apiKey (TradingView compatibility)
+		if requestKey == "" && c.Request.Method == "POST" && c.FullPath() == "/api/trade" {
+			// Read the body
+			bodyBytes, err := io.ReadAll(c.Request.Body)
+			if err == nil {
+				// Restore the body for the handler
+				c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+				// Try to parse JSON and extract apiKey
+				var bodyMap map[string]interface{}
+				if err := json.Unmarshal(bodyBytes, &bodyMap); err == nil {
+					if key, exists := bodyMap["apiKey"]; exists {
+						if keyStr, ok := key.(string); ok {
+							requestKey = keyStr
+						}
+					}
+				}
+			}
+		}
+
 		if requestKey == "" {
 			c.JSON(http.StatusUnauthorized, gin.H{
 				"success": false,
 				"message": "Missing API key",
-				"error":   "API key required in X-API-Key header or Authorization Bearer token",
+				"error":   "API key required in X-API-Key header, Authorization Bearer token, or apiKey field in request body for /trade endpoint",
 			})
 			c.Abort()
 			return
