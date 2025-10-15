@@ -98,6 +98,10 @@ definitions:
       leverage:
         example: 10
         type: integer
+      marginType:
+        description: 'ISOLATED or CROSSED (default: ISOLATED)'
+        example: ISOLATED
+        type: string
       orderId:
         example: 123456789
         type: integer
@@ -114,6 +118,10 @@ definitions:
       size:
         example: 1000
         type: number
+      slOrderId:
+        description: Stop Loss order ID
+        example: 123456790
+        type: integer
       status:
         description: PENDING, ACTIVE, FILLED, CANCELED, FAILED
         example: ACTIVE
@@ -127,6 +135,10 @@ definitions:
       takeProfit:
         example: 52000
         type: number
+      tpOrderId:
+        description: Take Profit order ID
+        example: 123456791
+        type: integer
       userId:
         example: user123
         type: string
@@ -148,6 +160,10 @@ definitions:
         maximum: 125
         minimum: 1
         type: integer
+      marginType:
+        description: '"ISOLATED" or "CROSSED" (default: ISOLATED)'
+        example: ISOLATED
+        type: string
       orderType:
         description: '"MARKET" or "LIMIT" (default: MARKET)'
         example: MARKET

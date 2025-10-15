@@ -1242,6 +1242,11 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 10
                 },
+                "marginType": {
+                    "description": "ISOLATED or CROSSED (default: ISOLATED)",
+                    "type": "string",
+                    "example": "ISOLATED"
+                },
                 "orderId": {
                     "type": "integer",
                     "example": 123456789
@@ -1263,6 +1268,11 @@ const docTemplate = `{
                     "type": "number",
                     "example": 1000
                 },
+                "slOrderId": {
+                    "description": "Stop Loss order ID",
+                    "type": "integer",
+                    "example": 123456790
+                },
                 "status": {
                     "description": "PENDING, ACTIVE, FILLED, CANCELED, FAILED",
                     "type": "string",
@@ -1279,6 +1289,11 @@ const docTemplate = `{
                 "takeProfit": {
                     "type": "number",
                     "example": 52000
+                },
+                "tpOrderId": {
+                    "description": "Take Profit order ID",
+                    "type": "integer",
+                    "example": 123456791
                 },
                 "userId": {
                     "type": "string",
@@ -1315,6 +1330,11 @@ const docTemplate = `{
                     "maximum": 125,
                     "minimum": 1,
                     "example": 10
+                },
+                "marginType": {
+                    "description": "\"ISOLATED\" or \"CROSSED\" (default: ISOLATED)",
+                    "type": "string",
+                    "example": "ISOLATED"
                 },
                 "orderType": {
                     "description": "\"MARKET\" or \"LIMIT\" (default: MARKET)",

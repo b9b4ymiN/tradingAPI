@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/adshao/go-binance/v2/futures"
@@ -64,8 +65,39 @@ func testBinanceConnection(client *futures.Client) error {
 func (b *Client) PlaceFuturesOrder(trade *models.Trade) (*OrderResult, error) {
 	ctx := context.Background()
 
-	// 1. Set leverage
-	_, err := b.client.NewChangeLeverageService().
+	// 0. Get symbol precision info
+	symbolInfo, err := b.getSymbolInfo(trade.Symbol)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get symbol info: %v", err)
+	}
+	log.Printf("📊 Symbol Info - %s: PricePrecision=%d, QuantityPrecision=%d, MinNotional=%s",
+		trade.Symbol, symbolInfo.PricePrecision, symbolInfo.QuantityPrecision, symbolInfo.MinNotional)
+
+	// 1. Set margin type (default to ISOLATED if not specified)
+	marginType := trade.MarginType
+	if marginType == "" {
+		marginType = "ISOLATED"
+	}
+
+	err = b.client.NewChangeMarginTypeService().
+		Symbol(trade.Symbol).
+		MarginType(futures.MarginType(marginType)).
+		Do(ctx)
+	if err != nil {
+		// Ignore error if margin type is already set to desired type
+		// Error -4046 means "No need to change margin type"
+		errStr := err.Error()
+		if !strings.Contains(errStr, "-4046") && !strings.Contains(errStr, "No need to change margin type") {
+			log.Printf("Warning: Failed to set margin type to %s: %v", marginType, err)
+		} else {
+			log.Printf("Margin type already set to %s for %s", marginType, trade.Symbol)
+		}
+	} else {
+		log.Printf("✅ Margin type set to %s for %s", marginType, trade.Symbol)
+	}
+
+	// 2. Set leverage
+	_, err = b.client.NewChangeLeverageService().
 		Symbol(trade.Symbol).
 		Leverage(trade.Leverage).
 		Do(ctx)
@@ -73,14 +105,51 @@ func (b *Client) PlaceFuturesOrder(trade *models.Trade) (*OrderResult, error) {
 		return nil, fmt.Errorf("failed to set leverage: %v", err)
 	}
 
-	// 2. Calculate quantity
-	quantity := b.calculateQuantity(trade.Size, trade.EntryPrice, trade.Leverage)
+	// 3. Get current price for MARKET orders (for accurate notional calculation)
+	priceForCalculation := trade.EntryPrice
+	if trade.OrderType == "" || trade.OrderType == "MARKET" {
+		currentPrice, err := b.GetPrice(trade.Symbol)
+		if err != nil {
+			log.Printf("⚠️ Failed to get current price, using entry price: %v", err)
+		} else {
+			priceForCalculation = currentPrice
+			log.Printf("📊 Using current market price for calculation: %.8f", currentPrice)
+		}
+	}
 
-	// 2.1 Validate minimum notional value (position size)
-	// Different symbols have different minimums:
-	// - BTCUSDT, ETHUSDT: $100 minimum
-	// - XRP, TRX, ADA, BNB, etc.: $5 minimum
-	// - Check Binance docs for specific symbol requirements
+	// 3.1 Calculate quantity
+	quantity := b.calculateQuantity(trade.Size, priceForCalculation, trade.Leverage, symbolInfo.QuantityPrecision, symbolInfo.StepSize)
+	log.Printf("📊 Calculated quantity: %s %s", quantity, trade.Symbol)
+
+	// 3.2 Validate quantity is not zero
+	parsedQty, _ := strconv.ParseFloat(quantity, 64)
+	if parsedQty == 0 {
+		return nil, fmt.Errorf("calculated quantity is zero. Please increase Size. Current: Size=%.2f USDT, Leverage=%dx, Price=%.2f",
+			trade.Size, trade.Leverage, priceForCalculation)
+	}
+
+	// 3.3 Validate minimum quantity
+	minQty, _ := strconv.ParseFloat(symbolInfo.MinQuantity, 64)
+	if parsedQty < minQty {
+		return nil, fmt.Errorf("quantity (%.8f) is below minimum (%.8f) for %s. Please increase Size from %.2f USDT",
+			parsedQty, minQty, trade.Symbol, trade.Size)
+	}
+
+	// 3.4 Validate maximum quantity
+	maxQty, _ := strconv.ParseFloat(symbolInfo.MaxQuantity, 64)
+	if maxQty > 0 && parsedQty > maxQty {
+		return nil, fmt.Errorf("quantity (%.8f) exceeds maximum (%.8f) for %s. Please decrease Size",
+			parsedQty, maxQty, trade.Symbol)
+	}
+
+	// 3.5 Validate minimum notional value (position size)
+	minNotional, _ := strconv.ParseFloat(symbolInfo.MinNotional, 64)
+	notionalValue := parsedQty * priceForCalculation
+	if notionalValue < minNotional {
+		return nil, fmt.Errorf("order value (%.2f USDT) is below minimum notional (%.2f USDT) for %s. Please increase Size or Leverage",
+			notionalValue, minNotional, trade.Symbol)
+	}
+	log.Printf("✅ Validation passed - Quantity: %s, Notional: %.2f USDT (min: %.2f USDT)", quantity, notionalValue, minNotional)
 
 	// 3. Place order (MARKET or LIMIT)
 	orderService := b.client.NewCreateOrderService().
@@ -91,12 +160,16 @@ func (b *Client) PlaceFuturesOrder(trade *models.Trade) (*OrderResult, error) {
 	// Choose order type based on trade.OrderType
 	if trade.OrderType == "LIMIT" {
 		// LIMIT order: Wait for specific entry price
+		// Format entry price with correct precision
+		formattedEntryPrice := b.formatPrice(trade.EntryPrice, symbolInfo.PricePrecision)
 		orderService.Type(futures.OrderTypeLimit).
-			Price(fmt.Sprintf("%.8f", trade.EntryPrice)).
+			Price(formattedEntryPrice).
 			TimeInForce(futures.TimeInForceTypeGTC) // Good Till Cancel
+		log.Printf("📌 Placing LIMIT order: Symbol=%s, Price=%s, Quantity=%s", trade.Symbol, formattedEntryPrice, quantity)
 	} else {
 		// MARKET order (default): Execute immediately at current price
 		orderService.Type(futures.OrderTypeMarket)
+		log.Printf("📌 Placing MARKET order: Symbol=%s, Quantity=%s", trade.Symbol, quantity)
 	}
 
 	order, err := orderService.Do(ctx)
@@ -115,17 +188,21 @@ func (b *Client) PlaceFuturesOrder(trade *models.Trade) (*OrderResult, error) {
 	}
 
 	// 5. Place Stop Loss order
-	slOrderID, err := b.placeStopLoss(trade.Symbol, trade.Side, quantity, trade.StopLoss)
+	log.Printf("📌 Placing Stop Loss order for %s...", trade.Symbol)
+	slOrderID, err := b.placeStopLoss(trade.Symbol, trade.Side, quantity, trade.StopLoss, symbolInfo.PricePrecision)
 	if err != nil {
-		log.Printf("Warning: Failed to place SL order: %v", err)
+		log.Printf("❌ Failed to place SL order: %v", err)
+		// Don't fail the entire trade, just log the error
 	} else {
 		result.SLOrderID = slOrderID
 	}
 
 	// 6. Place Take Profit order
-	tpOrderID, err := b.placeTakeProfit(trade.Symbol, trade.Side, quantity, trade.TakeProfit)
+	log.Printf("📌 Placing Take Profit order for %s...", trade.Symbol)
+	tpOrderID, err := b.placeTakeProfit(trade.Symbol, trade.Side, quantity, trade.TakeProfit, symbolInfo.PricePrecision)
 	if err != nil {
-		log.Printf("Warning: Failed to place TP order: %v", err)
+		log.Printf("❌ Failed to place TP order: %v", err)
+		// Don't fail the entire trade, just log the error
 	} else {
 		result.TPOrderID = tpOrderID
 	}
@@ -134,7 +211,7 @@ func (b *Client) PlaceFuturesOrder(trade *models.Trade) (*OrderResult, error) {
 }
 
 // Place Stop Loss order
-func (b *Client) placeStopLoss(symbol, side, quantity string, stopPrice float64) (int64, error) {
+func (b *Client) placeStopLoss(symbol, side, quantity string, stopPrice float64, pricePrecision int) (int64, error) {
 	ctx := context.Background()
 
 	// Reverse side for closing position
@@ -143,24 +220,29 @@ func (b *Client) placeStopLoss(symbol, side, quantity string, stopPrice float64)
 		closeSide = futures.SideTypeBuy
 	}
 
+	// Format stop price with correct precision
+	formattedStopPrice := b.formatPrice(stopPrice, pricePrecision)
+
+	// Use ClosePosition(true) to automatically close the entire position
+	// Do NOT specify Quantity when using ClosePosition
 	order, err := b.client.NewCreateOrderService().
 		Symbol(symbol).
 		Side(closeSide).
 		Type(futures.OrderTypeStopMarket).
-		StopPrice(fmt.Sprintf("%.8f", stopPrice)).
-		Quantity(quantity).
+		StopPrice(formattedStopPrice).
 		ClosePosition(true).
 		Do(ctx)
 
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to place SL order: %v", err)
 	}
 
+	log.Printf("✅ Stop Loss order placed: OrderID=%d, Symbol=%s, StopPrice=%s", order.OrderID, symbol, formattedStopPrice)
 	return order.OrderID, nil
 }
 
 // Place Take Profit order
-func (b *Client) placeTakeProfit(symbol, side, quantity string, tpPrice float64) (int64, error) {
+func (b *Client) placeTakeProfit(symbol, side, quantity string, tpPrice float64, pricePrecision int) (int64, error) {
 	ctx := context.Background()
 
 	// Reverse side for closing position
@@ -169,44 +251,100 @@ func (b *Client) placeTakeProfit(symbol, side, quantity string, tpPrice float64)
 		closeSide = futures.SideTypeBuy
 	}
 
+	// Format TP price with correct precision
+	formattedTPPrice := b.formatPrice(tpPrice, pricePrecision)
+
+	// Use ClosePosition(true) to automatically close the entire position
+	// Do NOT specify Quantity when using ClosePosition
 	order, err := b.client.NewCreateOrderService().
 		Symbol(symbol).
 		Side(closeSide).
 		Type(futures.OrderTypeTakeProfitMarket).
-		StopPrice(fmt.Sprintf("%.8f", tpPrice)).
-		Quantity(quantity).
+		StopPrice(formattedTPPrice).
 		ClosePosition(true).
 		Do(ctx)
 
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to place TP order: %v", err)
 	}
 
+	log.Printf("✅ Take Profit order placed: OrderID=%d, Symbol=%s, TPPrice=%s", order.OrderID, symbol, formattedTPPrice)
 	return order.OrderID, nil
 }
 
+// getSymbolInfo - Get symbol precision information
+func (b *Client) getSymbolInfo(symbol string) (*SymbolInfo, error) {
+	exchangeInfo, err := b.GetExchangeInfo(symbol)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(exchangeInfo.Symbols) == 0 {
+		return nil, fmt.Errorf("symbol %s not found", symbol)
+	}
+
+	return &exchangeInfo.Symbols[0], nil
+}
+
+// formatPrice - Format price with correct precision
+func (b *Client) formatPrice(price float64, precision int) string {
+	formatStr := fmt.Sprintf("%%.%df", precision)
+	return fmt.Sprintf(formatStr, price)
+}
+
 // Calculate position quantity based on size and leverage
-func (b *Client) calculateQuantity(size, price float64, leverage int) string {
+func (b *Client) calculateQuantity(size, price float64, leverage int, quantityPrecision int, stepSize string) string {
 	// Calculate quantity: (position size in USDT * leverage) / price
 	quantity := (size * float64(leverage)) / price
 
-	// Round to reasonable precision based on quantity size
-	// Different symbols have different precision requirements:
-	// - BTC: 3 decimals (0.001)
-	// - XRP, ADA: 1 decimal (0.1)
-	// - TRX: 0 decimals (1)
-	var precision int
-	if quantity < 1 {
-		precision = 3 // Small quantities (BTC, ETH)
-	} else if quantity < 100 {
-		precision = 1 // Medium quantities (XRP, ADA, BNB)
-	} else {
-		precision = 0 // Large quantities (TRX, DOGE)
+	// Parse step size
+	step, _ := strconv.ParseFloat(stepSize, 64)
+	if step <= 0 {
+		step = 1.0 / float64(pow10(quantityPrecision))
 	}
 
-	// Format with determined precision
-	formatStr := fmt.Sprintf("%%.%df", precision)
-	return fmt.Sprintf(formatStr, quantity)
+	// Round quantity to nearest step size
+	// Example: if stepSize=0.001, quantity=0.0018 → 0.002
+	quantity = roundToStepSize(quantity, step)
+
+	// Calculate the minimum quantity based on step size
+	minQuantity := step
+
+	// If quantity is less than minimum, round UP to minimum
+	if quantity < minQuantity {
+		quantity = minQuantity
+		log.Printf("⚠️ Quantity too small (%.8f), rounded up to minimum: %.8f", (size*float64(leverage))/price, quantity)
+	}
+
+	// Format with symbol's quantity precision
+	formatStr := fmt.Sprintf("%%.%df", quantityPrecision)
+	formattedQty := fmt.Sprintf(formatStr, quantity)
+
+	// Parse back to verify it's not zero
+	parsedQty, _ := strconv.ParseFloat(formattedQty, 64)
+	if parsedQty == 0 {
+		// Force to minimum quantity
+		return fmt.Sprintf(formatStr, minQuantity)
+	}
+
+	return formattedQty
+}
+
+// roundToStepSize rounds a value to the nearest step size
+func roundToStepSize(value, stepSize float64) float64 {
+	if stepSize == 0 {
+		return value
+	}
+	return float64(int64(value/stepSize+0.5)) * stepSize
+}
+
+// Helper function to calculate 10^n
+func pow10(n int) int {
+	result := 1
+	for i := 0; i < n; i++ {
+		result *= 10
+	}
+	return result
 }
 
 // MonitorTrade - Monitor trade and update status in Firebase

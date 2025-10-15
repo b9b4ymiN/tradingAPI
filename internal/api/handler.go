@@ -76,6 +76,12 @@ func TradeHandler(fb FirebaseInterface, bn BinanceInterface) gin.HandlerFunc {
 			orderType = "MARKET" // Default to MARKET order
 		}
 
+		// Set default margin type if not specified
+		marginType := req.MarginType
+		if marginType == "" {
+			marginType = "ISOLATED" // Default to ISOLATED margin
+		}
+
 		// Create trade record
 		trade := &models.Trade{
 			ID:         tradeID,
@@ -83,6 +89,7 @@ func TradeHandler(fb FirebaseInterface, bn BinanceInterface) gin.HandlerFunc {
 			Symbol:     req.Symbol,
 			Side:       req.Side,
 			OrderType:  orderType,
+			MarginType: marginType,
 			EntryPrice: req.EntryPrice,
 			StopLoss:   req.StopLoss,
 			TakeProfit: req.TakeProfit,
@@ -112,6 +119,8 @@ func TradeHandler(fb FirebaseInterface, bn BinanceInterface) gin.HandlerFunc {
 		// Update trade with order result
 		trade.Status = "ACTIVE"
 		trade.OrderID = orderResult.OrderID
+		trade.SLOrderID = orderResult.SLOrderID
+		trade.TPOrderID = orderResult.TPOrderID
 		trade.ExecutedPrice = orderResult.AvgPrice
 		trade.ExecutedAt = time.Now().Unix()
 

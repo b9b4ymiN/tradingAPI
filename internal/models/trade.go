@@ -7,6 +7,7 @@ type Trade struct {
 	Symbol        string  `json:"symbol" example:"BTCUSDT"`
 	Side          string  `json:"side" example:"BUY"`
 	OrderType     string  `json:"orderType,omitempty" example:"MARKET"` // MARKET or LIMIT
+	MarginType    string  `json:"marginType,omitempty" example:"ISOLATED"` // ISOLATED or CROSSED (default: ISOLATED)
 	EntryPrice    float64 `json:"entryPrice" example:"50000.00"`
 	ExecutedPrice float64 `json:"executedPrice,omitempty" example:"50100.50"`
 	StopLoss      float64 `json:"stopLoss" example:"49000.00"`
@@ -15,6 +16,8 @@ type Trade struct {
 	Size          float64 `json:"size" example:"1000.00"`
 	Status        string  `json:"status" example:"ACTIVE"` // PENDING, ACTIVE, FILLED, CANCELED, FAILED
 	OrderID       int64   `json:"orderId,omitempty" example:"123456789"`
+	SLOrderID     int64   `json:"slOrderId,omitempty" example:"123456790"` // Stop Loss order ID
+	TPOrderID     int64   `json:"tpOrderId,omitempty" example:"123456791"` // Take Profit order ID
 	Error         string  `json:"error,omitempty" example:""`
 	CreatedAt     int64   `json:"createdAt" example:"1640995200"`
 	ExecutedAt    int64   `json:"executedAt,omitempty" example:"1640995260"`
@@ -33,6 +36,7 @@ type TradeRequest struct {
 	Leverage   int     `json:"leverage" binding:"required,min=1,max=125" example:"10"` // Leverage (1-125x)
 	Size       float64 `json:"size" binding:"required,gt=0" example:"1000.00"`      // Position size in USDT
 	OrderType  string  `json:"orderType,omitempty" example:"MARKET"`                // "MARKET" or "LIMIT" (default: MARKET)
+	MarginType string  `json:"marginType,omitempty" example:"ISOLATED"`             // "ISOLATED" or "CROSSED" (default: ISOLATED)
 	APIKey     string  `json:"apiKey,omitempty" example:"your-api-key-here"`        // Optional: API key for authentication (useful for TradingView alerts)
 }
 
